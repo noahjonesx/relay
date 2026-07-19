@@ -1,0 +1,6 @@
+.spotify_cache
+config.py
+sync_log.txt
+tracks.json
+__pycache__/
+*.pyc
