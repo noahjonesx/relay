@@ -1,4 +1,5 @@
 .spotify_cache
+.cache
 config.py
 sync_log.txt
 tracks.json
