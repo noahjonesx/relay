@@ -194,6 +194,14 @@ def get_albums():
         album["track_count"] += 1
     return sorted(albums.values(), key=lambda a: (a["artist"].lower(), a["album"].lower()))
 
+@app.delete("/api/library/{uri:path}")
+def delete_track(uri: str):
+    manifest = sync.load_manifest()
+    result = sync.delete_track(uri, manifest)
+    if result["status"] == "error":
+        raise HTTPException(404, result["message"])
+    return result
+
 @app.get("/api/art")
 def get_art(path: str):
     """Serve an album's cover.jpg. `path` is the album's folder relative to

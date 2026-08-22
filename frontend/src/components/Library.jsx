@@ -4,6 +4,27 @@ import StatTile from "./StatTile";
 import ImportDropzone from "./ImportDropzone";
 import AlbumGrid from "./AlbumGrid";
 
+function albumArtUrl(path) {
+  const dir = path.split("/").slice(0, -1).join("/");
+  return `/api/art?path=${encodeURIComponent(dir)}`;
+}
+
+function TrackThumb({ track }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <div className="track-thumb track-thumb--placeholder">{track.album.slice(0, 1).toUpperCase()}</div>;
+  }
+  return (
+    <img
+      className="track-thumb"
+      src={albumArtUrl(track.path)}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function AddToPlaylist({ track, playlists, onAdded }) {
   const [busy, setBusy] = useState(false);
 
@@ -50,6 +71,23 @@ export default function Library() {
   };
 
   useEffect(load, []);
+
+  const deleteTrack = async (t) => {
+    if (!window.confirm(`Delete "${t.artist} – ${t.title}"? This removes the file from your library and the iPod.`)) {
+      return;
+    }
+    try {
+      const result = await api.deleteTrack(t.uri);
+      setToast(
+        result.shared_file_retained
+          ? `Removed "${t.title}" (file kept — still used by a duplicate)`
+          : `Deleted "${t.title}" from the library and iPod`
+      );
+      load();
+    } catch (e) {
+      setToast(`Failed to delete "${t.title}": ${e.message}`);
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -111,21 +149,23 @@ export default function Library() {
           <table className="track-table">
             <thead>
               <tr>
+                <th></th>
                 <th>Artist</th>
                 <th>Title</th>
                 <th>Album</th>
-                <th>Source</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((t) => (
                 <tr key={t.uri}>
+                  <td className="track-thumb-cell">
+                    <TrackThumb track={t} />
+                  </td>
                   <td>{t.artist}</td>
                   <td>{t.title}</td>
                   <td>{t.album}</td>
-                  <td>{t.local ? "Local import" : "Spotify"}</td>
-                  <td>
+                  <td className="track-actions">
                     {t.local && (
                       <AddToPlaylist
                         track={t}
@@ -133,6 +173,12 @@ export default function Library() {
                         onAdded={(name) => setToast(`Added "${t.title}" to ${name}`)}
                       />
                     )}
+                    <button
+                      className="button button--danger button--tiny"
+                      onClick={() => deleteTrack(t)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

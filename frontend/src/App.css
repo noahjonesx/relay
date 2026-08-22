@@ -1,51 +1,58 @@
 .app-shell {
-  max-width: 960px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 24px 20px 60px;
+  padding: 32px 24px 72px;
 }
 
 .app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 .app-header h1 {
-  font-size: 20px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 
 .ipod-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 7px;
+  font-size: 12.5px;
   color: var(--text-muted);
-  padding: 4px 10px;
+  padding: 6px 12px;
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 999px;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 .ipod-badge--on {
   color: var(--status-good);
-  border-color: var(--status-good);
+  border-color: transparent;
+  background: var(--status-good-dim);
 }
 
 .app-tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .app-tab {
   background: none;
   border: none;
   color: var(--text-muted);
-  padding: 10px 16px;
+  padding: 10px 4px;
+  margin-right: 22px;
   font-size: 14px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 .app-tab:hover {
   color: var(--text-primary);
@@ -58,82 +65,110 @@
 .panel-stack {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 /* Stat tiles */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
 }
 .stat-tile {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-1);
 }
 .stat-tile-value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 .stat-tile-label {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin-top: 6px;
 }
 
 /* Status pill */
 .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  padding: 4px 12px;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 5px 13px;
   border-radius: 999px;
-  border: 1px solid var(--border);
   width: fit-content;
 }
-.status-pill--muted { color: var(--text-muted); }
-.status-pill--accent { color: var(--accent); border-color: var(--accent); }
-.status-pill--good { color: var(--status-good); border-color: var(--status-good); }
-.status-pill--critical { color: var(--status-critical); border-color: var(--status-critical); }
+.status-pill--muted { color: var(--text-muted); background: var(--surface-2); }
+.status-pill--accent { color: var(--accent-soft); background: var(--accent-dim); }
+.status-pill--good { color: var(--status-good); background: var(--status-good-dim); }
+.status-pill--critical { color: var(--status-critical); background: var(--status-critical-dim); }
 
 /* Inputs & buttons */
 .text-input {
   background: var(--surface-1);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  padding: 10px 13px;
   font-size: 14px;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .text-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 .button {
   background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 9px 14px;
+  color: #0d1117;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
   font-size: 13px;
   cursor: pointer;
+  transition: filter 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 .button--ghost {
-  background: var(--surface-2);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
+.button--ghost:hover:not(:disabled) {
   color: var(--text-primary);
-  border: 1px solid var(--border);
+  border-color: var(--text-muted);
+  filter: none;
+  background: var(--surface-2);
 }
 .button--danger {
-  background: var(--status-critical);
+  background: transparent;
+  color: var(--status-critical);
+  border: 1px solid transparent;
+}
+.button--danger:hover:not(:disabled) {
+  background: var(--status-critical-dim);
+  filter: none;
+}
+.button--tiny {
+  padding: 5px 11px;
+  font-size: 12px;
 }
 
 /* Library toolbar */
@@ -147,30 +182,34 @@
 }
 .view-toggle {
   display: flex;
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
   flex-shrink: 0;
 }
 .view-toggle-btn {
-  background: var(--surface-1);
+  background: none;
   color: var(--text-muted);
   border: none;
-  padding: 9px 14px;
+  border-radius: 6px;
+  padding: 7px 14px;
   font-size: 13px;
   cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 .view-toggle-btn--active {
-  background: var(--accent);
-  color: white;
+  background: var(--surface-3);
+  color: var(--text-primary);
 }
 
 .mini-select {
   background: var(--surface-2);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: 12px;
 }
 
@@ -178,7 +217,7 @@
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 .album-card {
   display: flex;
@@ -188,20 +227,26 @@
 .album-cover {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   object-fit: cover;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.album-card:hover .album-cover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
 }
 .album-cover--placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 32px;
+  font-weight: 600;
   color: var(--text-muted);
 }
 .album-card-title {
-  margin-top: 6px;
+  margin-top: 10px;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -210,6 +255,7 @@
 }
 .album-card-subtitle {
   font-size: 12px;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -217,30 +263,42 @@
 
 /* Library table */
 .table-wrap {
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 .track-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 .track-table th {
   text-align: left;
-  background: var(--surface-1);
-  color: var(--text-secondary);
-  font-weight: 500;
-  padding: 10px 14px;
-  position: sticky;
-  top: 0;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 16px;
 }
 .track-table td {
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-top: 1px solid var(--border);
 }
+.track-table tbody tr {
+  transition: background 0.12s var(--ease);
+}
 .track-table tbody tr:hover {
-  background: var(--surface-1);
+  background: var(--surface-2);
+}
+.track-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .text-muted {
@@ -253,15 +311,16 @@
 
 /* Import dropzone */
 .import-zone {
-  border: 2px dashed var(--border);
-  border-radius: 10px;
-  padding: 24px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 28px;
   text-align: center;
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
 }
 .import-zone--active {
   border-color: var(--accent);
@@ -281,8 +340,8 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 13px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   border: 1px solid var(--border);
 }
@@ -311,7 +370,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .playlist-row {
   display: flex;
@@ -319,8 +378,9 @@
   gap: 10px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-1);
 }
 .playlist-row-main {
   display: flex;
@@ -337,7 +397,7 @@
 .extra-track-list {
   list-style: none;
   margin: 0;
-  padding: 8px 0 0;
+  padding: 10px 0 0;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -351,10 +411,6 @@
 }
 .extra-track-row span:first-child {
   flex: 1;
-}
-.button--tiny {
-  padding: 4px 10px;
-  font-size: 12px;
 }
 
 .switch {
@@ -374,7 +430,7 @@
   inset: 0;
   background: var(--surface-3);
   border-radius: 999px;
-  transition: background 0.15s;
+  transition: background 0.15s var(--ease);
 }
 .switch-track::before {
   content: "";
@@ -383,14 +439,15 @@
   width: 16px;
   left: 3px;
   top: 3px;
-  background: white;
+  background: var(--text-primary);
   border-radius: 50%;
-  transition: transform 0.15s;
+  transition: transform 0.15s var(--ease);
 }
 .switch input:checked + .switch-track {
   background: var(--accent);
 }
 .switch input:checked + .switch-track::before {
+  background: #0d1117;
   transform: translateX(16px);
 }
 
@@ -398,7 +455,7 @@
 .sync-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .sync-buttons {
   display: flex;
@@ -408,11 +465,13 @@
 .log-view {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
+  border-radius: var(--radius-md);
+  padding: 16px;
   height: 420px;
   overflow-y: auto;
   white-space: pre-wrap;
   font-size: 12.5px;
+  line-height: 1.5;
   color: var(--text-secondary);
+  box-shadow: var(--shadow-1);
 }

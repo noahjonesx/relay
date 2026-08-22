@@ -472,7 +472,26 @@ def write_playlist(name, all_tracks, manifest):
         f.write("\n".join(lines) + "\n")
     return len(lines)
 
-# ── iPod file removal ───────────────────────────────────────────────────────
+# ── File removal ────────────────────────────────────────────────────────────
+def _prune_empty_dirs(start_dir, stop_at):
+    """Remove now-empty album/artist directories, walking upward from
+    start_dir but never touching stop_at itself. A directory containing only
+    a stray cover.jpg counts as empty."""
+    stop_at = os.path.normpath(stop_at)
+    d = os.path.normpath(start_dir)
+    while d != stop_at and d.startswith(stop_at):
+        try:
+            entries = os.listdir(d)
+            if entries == ["cover.jpg"]:
+                os.remove(os.path.join(d, "cover.jpg"))
+                entries = []
+            if entries:
+                break
+            os.rmdir(d)
+            d = os.path.dirname(d)
+        except Exception:
+            break
+
 def remove_from_ipod(ipod_music, rel_path):
     """Best-effort removal of a track (and now-empty album/artist dirs) from
     the iPod. Safe to call even if the file isn't actually there."""
@@ -483,18 +502,49 @@ def remove_from_ipod(ipod_music, rel_path):
         os.remove(ipod_path)
     except Exception:
         return
-    parent = os.path.dirname(ipod_path)
-    for _ in range(2):
-        try:
-            entries = os.listdir(parent)
-            if entries == ["cover.jpg"]:
-                os.remove(os.path.join(parent, "cover.jpg"))
-                entries = []
-            if not entries:
-                os.rmdir(parent)
-            parent = os.path.dirname(parent)
-        except Exception:
-            break
+    _prune_empty_dirs(os.path.dirname(ipod_path), ipod_music)
+
+def delete_track(uri, manifest):
+    """Delete a track from the local library and, if connected, the iPod;
+    mark it in the manifest so it's never re-downloaded (same contract as
+    manually deleting the file and running a sync). Won't touch the actual
+    file if another live URI still shares it via an alias."""
+    entry = manifest.get(uri)
+    if not entry:
+        return {"status": "error", "message": "Track not found"}
+    if entry.get("deleted"):
+        return {"status": "already_deleted"}
+
+    path = entry["path"]
+    shared = any(
+        other_uri != uri and other_info.get("path") == path and not other_info.get("deleted")
+        for other_uri, other_info in manifest.items()
+    )
+
+    if not shared:
+        full = os.path.join(MUSIC_DIR, path.replace("/", os.sep))
+        if os.path.exists(full):
+            os.remove(full)
+            _prune_empty_dirs(os.path.dirname(full), MUSIC_DIR)
+        ipod_music = f"{IPOD_DRIVE}\\Music"
+        if os.path.isdir(ipod_music):
+            remove_from_ipod(ipod_music, path)
+
+    entry["deleted"] = True
+    save_manifest(manifest)
+
+    # Drop any manual playlist assignments pointing at this URI.
+    playlists = load_playlists()
+    changed = False
+    for p in playlists:
+        extra = p.get("extra_tracks")
+        if extra and uri in extra:
+            extra.remove(uri)
+            changed = True
+    if changed:
+        save_playlists(playlists)
+
+    return {"status": "deleted", "shared_file_retained": shared}
 
 # ── Clean deleted tracks ──────────────────────────────────────────────────────
 def clean_deleted(manifest):

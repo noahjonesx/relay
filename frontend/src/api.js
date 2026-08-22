@@ -17,6 +17,7 @@ async function request(path, opts) {
 
 export const api = {
   library: () => request("/library"),
+  deleteTrack: (uri) => request(`/library/${encodeURIComponent(uri)}`, { method: "DELETE" }),
   albums: () => request("/albums"),
   playlists: () => request("/playlists"),
   togglePlaylist: (name, enabled) =>
