@@ -32,6 +32,22 @@ def normalize_key(artist, title):
         return s.strip()
     return f"{norm(artist)}|{norm(title)}"
 
+ALT_VERSION_RE = re.compile(r"\b(live|acoustic|unplugged|concert|session|demo)\b", re.IGNORECASE)
+
+def is_alt_version(album, title):
+    """True if this looks like a live/acoustic/etc. recording rather than
+    the studio version — used to break ties when the same song shows up
+    under more than one Spotify URI."""
+    return bool(ALT_VERSION_RE.search(album or "") or ALT_VERSION_RE.search(title or ""))
+
+def choose_canonical(candidates):
+    """Given [(uri, info), ...] all sharing the same artist+title, prefer
+    the studio recording; otherwise keep whichever came first."""
+    for uri, info in candidates:
+        if not is_alt_version(info.get("album", ""), info.get("title", "")):
+            return uri, info
+    return candidates[0]
+
 def alias_track(track, owner_uri, manifest):
     """Point this track's URI at a file that already satisfies the same
     artist+title, instead of downloading a second copy."""
@@ -47,13 +63,14 @@ def alias_track(track, owner_uri, manifest):
 def resolve_duplicates(tracks, manifest):
     """Filter tracks down to the ones that actually need downloading,
     deduping by normalized artist+title (not just Spotify URI)."""
-    have_key = {}
+    by_key = {}
     for uri, info in manifest.items():
         if info.get("deleted"):
             continue
         if not os.path.exists(os.path.join(MUSIC_DIR, info["path"])):
             continue
-        have_key.setdefault(normalize_key(info["artist"], info["title"]), uri)
+        by_key.setdefault(normalize_key(info["artist"], info["title"]), []).append((uri, info))
+    have_key = {key: choose_canonical(cands)[0] for key, cands in by_key.items()}
 
     seen_uri, groups, aliased = set(), {}, 0
     for t in tracks:
@@ -77,6 +94,8 @@ def resolve_duplicates(tracks, manifest):
 
     to_download = []
     for group in groups.values():
+        # Prefer the studio recording as the one that actually gets downloaded.
+        group.sort(key=lambda t: is_alt_version(t["album"]["name"], t["name"]))
         primary, dupes = group[0], group[1:]
         if dupes:
             primary["_dupe_group"] = dupes
@@ -126,20 +145,22 @@ def dedupe_existing(manifest):
         if len(by_path) <= 1:
             continue  # only one real file backs this song already
 
-        paths = list(by_path.keys())
-        canonical_path, canonical_uri = paths[0], by_path[paths[0]][0]
+        canonical_uri, canonical_info = choose_canonical(entries)
+        canonical_path = canonical_info["path"]
         sample = entries[0][1]
         print(f"\nDuplicate found: {sample['artist']} - {sample['title']}")
         print(f"  Keeping:  {canonical_path}")
 
-        for path in paths[1:]:
+        for path, uris in by_path.items():
+            if path == canonical_path:
+                continue
             print(f"  Removing: {path}")
             full = os.path.join(MUSIC_DIR, path.replace("/", os.sep))
             if os.path.exists(full):
                 os.remove(full)
             if ipod_connected:
                 remove_from_ipod(ipod_music, path)
-            for uri in by_path[path]:
+            for uri in uris:
                 manifest[uri] = {
                     "path":         canonical_path,
                     "artist":       manifest[uri]["artist"],
