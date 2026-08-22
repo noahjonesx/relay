@@ -1,0 +1,52 @@
+const BASE = "/api";
+
+async function request(path, opts) {
+  const res = await fetch(`${BASE}${path}`, opts);
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      message = body.detail || message;
+    } catch {
+      // ignore — not JSON
+    }
+    throw new Error(message);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+export const api = {
+  library: () => request("/library"),
+  playlists: () => request("/playlists"),
+  togglePlaylist: (name, enabled) =>
+    request(`/playlists/${encodeURIComponent(name)}/toggle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }),
+  ipodStatus: () => request("/ipod"),
+  syncStatus: () => request("/sync/status"),
+  startSync: (opts) =>
+    request("/sync/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    }),
+  stopSync: () => request("/sync/stop", { method: "POST" }),
+  runDedupe: () => request("/sync/dedupe", { method: "POST" }),
+  importMp3: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/import`, { method: "POST", body: form });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || "Import failed");
+    return body;
+  },
+};
+
+export function connectLogSocket(onLine) {
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${window.location.host}/ws/logs`);
+  ws.onmessage = (evt) => onLine(evt.data);
+  return ws;
+}

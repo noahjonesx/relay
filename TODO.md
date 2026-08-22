@@ -8,7 +8,11 @@
 ### high priority
 - [ ] **Rich CLI** — replace plain print with `rich` library: colored output, spinners, live progress table. Quick win, looks great
 - [ ] **Retry logic** — try up to 3 `ytsearch` results before marking a track failed. Would fix most current failures
-- [ ] **GUI** — live progress window: current track downloading, album art thumbnail, overall progress bar, failed tracks list. Options: tkinter (simple) or Flask + htmx (web-based, looks more modern)
+- [x] **GUI (v1)** — React + FastAPI web UI (`frontend/`, `backend/`). Library view + search, playlist enable/disable + per-playlist sync, live sync log streaming, drag-and-drop MP3 import with dedup check. See README "web UI" section.
+  - [ ] v2: album art grid / real library visualization, storage stats
+  - [ ] v2: drag tracks onto a playlist to assign them (currently playlists are Spotify-sourced only; local imports aren't assignable to a playlist yet)
+  - [ ] v2: surface per-track failure reasons in the UI (currently just shows raw log lines)
+  - [ ] v2: package as a desktop app (Tauri/Electron) instead of two dev servers
 
 ### medium priority
 - [ ] **`--stats` command** — total tracks, artists, albums, storage used, last sync time, most-represented artists

@@ -82,12 +82,39 @@ py sync.py --artist "Title Fight"
 
 # sync to iPod only (no downloads)
 py sync.py --ipod-only
+
+# scan the library for the same song under two different Spotify URIs and merge them
+py sync.py --dedupe
 ```
 
 Watch progress live:
 ```powershell
 Get-Content sync_log.txt -Wait -Tail 20
 ```
+
+---
+
+## web UI
+
+A basic local web UI lives in `backend/` (FastAPI) and `frontend/` (React + Vite). It wraps `sync.py` rather than reimplementing it — the backend shells out to `py sync.py ...` and streams its output live, and calls straight into `sync.py`'s functions for the library view, playlist toggles, and MP3 import.
+
+**Run it (two terminals):**
+```bash
+# backend — http://localhost:8000
+py -m uvicorn backend.app:app --port 8000
+
+# frontend — http://localhost:5173
+cd frontend
+npm install   # first time only
+npm run dev
+```
+
+Open `http://localhost:5173`. Current features:
+- **Library** — searchable table of everything in `tracks.json`, plus track/artist/album counts. Drag-and-drop an MP3 onto the page to import it (looked up against Spotify for metadata/art, rejected if it's already a duplicate by artist+title).
+- **Playlists** — toggle which playlists from `playlists.json` are included in a full sync, see per-playlist track counts, or trigger a sync for just one.
+- **Sync** — start a full sync, download-only, iPod-only, or `--dedupe`, and watch the live log stream. Shows run status (idle/running/done/failed).
+
+This is a first pass — full library visualization (artwork grid, storage stats) and playlist drag-and-drop assignment are still on the todo list.
 
 ---
 

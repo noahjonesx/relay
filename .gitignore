@@ -5,3 +5,6 @@ sync_log.txt
 tracks.json
 __pycache__/
 *.pyc
+.import_tmp/
+frontend/node_modules/
+frontend/dist/
