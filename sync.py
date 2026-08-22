@@ -30,6 +30,16 @@ def save_playlists(playlists):
     with open(PLAYLISTS_FILE, "w", encoding="utf-8") as f:
         json.dump(playlists, f, indent=2, ensure_ascii=False)
 
+def playlist_extra_tracks(pl, manifest):
+    """Manually-assigned tracks (e.g. local MP3 imports) that aren't part of
+    the Spotify playlist itself but should still be written into its m3u8."""
+    tracks = []
+    for uri in pl.get("extra_tracks", []):
+        entry = manifest.get(uri)
+        if entry and not entry.get("deleted"):
+            tracks.append({"uri": uri})
+    return tracks
+
 # ── Duplicate detection ─────────────────────────────────────────────────────
 def normalize_key(artist, title):
     """Case/punctuation/accent-insensitive key so the same song under a
@@ -637,7 +647,7 @@ def main():
     print(f"\nFetching {len(playlists)} playlist(s) from Spotify...")
     playlist_data = []
     for pl in playlists:
-        tracks = fetch_playlist_tracks(sp, pl)
+        tracks = fetch_playlist_tracks(sp, pl) + playlist_extra_tracks(pl, manifest)
         playlist_data.append((pl["name"], tracks))
         print(f"  {pl['name']}: {len(tracks)} tracks")
 

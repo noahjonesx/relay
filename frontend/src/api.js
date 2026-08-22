@@ -17,12 +17,23 @@ async function request(path, opts) {
 
 export const api = {
   library: () => request("/library"),
+  albums: () => request("/albums"),
   playlists: () => request("/playlists"),
   togglePlaylist: (name, enabled) =>
     request(`/playlists/${encodeURIComponent(name)}/toggle`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled }),
+    }),
+  addTrackToPlaylist: (name, uri) =>
+    request(`/playlists/${encodeURIComponent(name)}/tracks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uri }),
+    }),
+  removeTrackFromPlaylist: (name, uri) =>
+    request(`/playlists/${encodeURIComponent(name)}/tracks/${encodeURIComponent(uri)}`, {
+      method: "DELETE",
     }),
   ipodStatus: () => request("/ipod"),
   syncStatus: () => request("/sync/status"),

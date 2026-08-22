@@ -14,9 +14,11 @@ from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 REPO_DIR = Path(__file__).resolve().parent.parent
@@ -172,6 +174,39 @@ def get_library():
         },
     }
 
+@app.get("/api/albums")
+def get_albums():
+    manifest = sync.load_manifest()
+    albums = {}
+    for info in manifest.values():
+        if info.get("deleted"):
+            continue
+        key = (info["artist"], info["album"])
+        album = albums.get(key)
+        if not album:
+            art_dir = str(Path(info["path"]).parent).replace("\\", "/")
+            album = albums[key] = {
+                "artist":      info["artist"],
+                "album":       info["album"],
+                "track_count": 0,
+                "art":         f"/api/art?path={quote(art_dir)}",
+            }
+        album["track_count"] += 1
+    return sorted(albums.values(), key=lambda a: (a["artist"].lower(), a["album"].lower()))
+
+@app.get("/api/art")
+def get_art(path: str):
+    """Serve an album's cover.jpg. `path` is the album's folder relative to
+    MUSIC_DIR (e.g. 'Artist/Album'), as returned by /api/albums."""
+    music_root = Path(sync.MUSIC_DIR).resolve()
+    album_dir = (music_root / path).resolve()
+    if music_root != album_dir and music_root not in album_dir.parents:
+        raise HTTPException(400, "Invalid path")
+    cover = album_dir / "cover.jpg"
+    if not cover.is_file():
+        raise HTTPException(404, "No cover art")
+    return FileResponse(cover, media_type="image/jpeg")
+
 # ── Playlists ────────────────────────────────────────────────────────────────
 def _playlist_track_count(name):
     m3u8 = Path(sync.MUSIC_DIR) / "Playlists" / f"{name}.m3u8"
@@ -179,9 +214,18 @@ def _playlist_track_count(name):
         return 0
     return sum(1 for line in m3u8.read_text(encoding="utf-8").splitlines() if line.strip())
 
+def _serialize_playlist(p, manifest):
+    extra = []
+    for uri in p.get("extra_tracks", []):
+        info = manifest.get(uri)
+        if info and not info.get("deleted"):
+            extra.append({"uri": uri, "artist": info["artist"], "title": info["title"]})
+    return {**p, "track_count": _playlist_track_count(p["name"]), "extra_tracks": extra}
+
 @app.get("/api/playlists")
 def get_playlists():
-    return [{**p, "track_count": _playlist_track_count(p["name"])} for p in sync.load_playlists()]
+    manifest = sync.load_manifest()
+    return [_serialize_playlist(p, manifest) for p in sync.load_playlists()]
 
 class ToggleRequest(BaseModel):
     enabled: Optional[bool] = None  # omit to flip the current value
@@ -193,7 +237,39 @@ def toggle_playlist(name: str, req: ToggleRequest = ToggleRequest()):
         if p["name"] == name:
             p["enabled"] = req.enabled if req.enabled is not None else not p["enabled"]
             sync.save_playlists(playlists)
-            return {**p, "track_count": _playlist_track_count(name)}
+            return _serialize_playlist(p, sync.load_manifest())
+    raise HTTPException(404, f"Playlist '{name}' not found")
+
+class AddTrackRequest(BaseModel):
+    uri: str
+
+@app.post("/api/playlists/{name}/tracks")
+def add_playlist_track(name: str, req: AddTrackRequest):
+    manifest = sync.load_manifest()
+    entry = manifest.get(req.uri)
+    if not entry or entry.get("deleted"):
+        raise HTTPException(404, "Track not found in library")
+
+    playlists = sync.load_playlists()
+    for p in playlists:
+        if p["name"] == name:
+            extra = p.setdefault("extra_tracks", [])
+            if req.uri not in extra:
+                extra.append(req.uri)
+            sync.save_playlists(playlists)
+            return _serialize_playlist(p, manifest)
+    raise HTTPException(404, f"Playlist '{name}' not found")
+
+@app.delete("/api/playlists/{name}/tracks/{uri:path}")
+def remove_playlist_track(name: str, uri: str):
+    playlists = sync.load_playlists()
+    for p in playlists:
+        if p["name"] == name:
+            extra = p.get("extra_tracks", [])
+            if uri in extra:
+                extra.remove(uri)
+                sync.save_playlists(playlists)
+            return _serialize_playlist(p, sync.load_manifest())
     raise HTTPException(404, f"Playlist '{name}' not found")
 
 # ── iPod status ──────────────────────────────────────────────────────────────

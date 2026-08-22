@@ -16,6 +16,11 @@ export default function Playlists({ onSyncStarted }) {
     setPlaylists((all) => all.map((x) => (x.name === p.name ? updated : x)));
   };
 
+  const removeTrack = async (p, uri) => {
+    const updated = await api.removeTrackFromPlaylist(p.name, uri);
+    setPlaylists((all) => all.map((x) => (x.name === p.name ? updated : x)));
+  };
+
   const syncOne = async (name) => {
     try {
       await api.startSync({ playlist: name });
@@ -33,22 +38,44 @@ export default function Playlists({ onSyncStarted }) {
       <ul className="playlist-list">
         {playlists.map((p) => (
           <li key={p.name} className="playlist-row">
-            <label className="switch">
-              <input type="checkbox" checked={p.enabled} onChange={() => toggle(p)} />
-              <span className="switch-track" />
-            </label>
-            <div className="playlist-info">
-              <div className="playlist-name">{p.name}</div>
-              <div className="text-muted">{p.track_count} tracks synced</div>
+            <div className="playlist-row-main">
+              <label className="switch">
+                <input type="checkbox" checked={p.enabled} onChange={() => toggle(p)} />
+                <span className="switch-track" />
+              </label>
+              <div className="playlist-info">
+                <div className="playlist-name">{p.name}</div>
+                <div className="text-muted">{p.track_count} tracks synced</div>
+              </div>
+              <button className="button button--ghost" onClick={() => syncOne(p.name)}>
+                Sync now
+              </button>
             </div>
-            <button className="button button--ghost" onClick={() => syncOne(p.name)}>
-              Sync now
-            </button>
+
+            {p.extra_tracks.length > 0 && (
+              <ul className="extra-track-list">
+                {p.extra_tracks.map((t) => (
+                  <li key={t.uri} className="extra-track-row">
+                    <span>
+                      {t.artist} – {t.title}
+                    </span>
+                    <span className="text-muted">local import</span>
+                    <button
+                      className="button button--ghost button--tiny"
+                      onClick={() => removeTrack(p, t.uri)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
       <p className="text-muted">
         Disabled playlists are skipped on the next full sync but aren't removed from your library.
+        Local imports added to a playlist show up here — assign them from the Library tab.
       </p>
     </div>
   );
