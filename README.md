@@ -77,6 +77,9 @@ py sync.py --no-ipod
 # single playlist
 py sync.py --playlist june26
 
+# all Liked Songs by a given artist
+py sync.py --artist "Title Fight"
+
 # sync to iPod only (no downloads)
 py sync.py --ipod-only
 ```

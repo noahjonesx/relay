@@ -1,0 +1,7 @@
+spotipy
+mutagen
+Pillow
+fastapi
+uvicorn[standard]
+python-multipart
+websockets

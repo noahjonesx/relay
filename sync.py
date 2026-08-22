@@ -1,6 +1,6 @@
-import io, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request
+import io, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request, uuid
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TRCK, TPE2, APIC, ID3NoHeaderError
 from PIL import Image
 
@@ -17,6 +17,18 @@ def sanitize(s):
     for c in r'\/:*?"<>|':
         s = s.replace(c, "-")
     return s.strip()
+
+# ── Playlists config ──────────────────────────────────────────────────────────
+def load_playlists():
+    with open(PLAYLISTS_FILE, encoding="utf-8") as f:
+        playlists = json.load(f)
+    for p in playlists:
+        p.setdefault("enabled", True)
+    return playlists
+
+def save_playlists(playlists):
+    with open(PLAYLISTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(playlists, f, indent=2, ensure_ascii=False)
 
 # ── Duplicate detection ─────────────────────────────────────────────────────
 def normalize_key(artist, title):
@@ -264,7 +276,11 @@ def process_track(track, manifest):
         with open(cover_path, "wb") as f:
             f.write(jpeg)
 
-    # Write ID3 tags from Spotify metadata
+    write_tags(out_path, artist, album, title, tnum, album_artist, jpeg)
+    return rel_path
+
+# ── ID3 tagging ───────────────────────────────────────────────────────────────
+def write_tags(out_path, artist, album, title, tnum, album_artist, jpeg):
     try:
         try:
             tags = ID3(out_path)
@@ -282,7 +298,102 @@ def process_track(track, manifest):
     except Exception as e:
         print(f"    Warning: tagging failed: {e}")
 
-    return rel_path
+# ── Manual MP3 import (drag-and-drop) ──────────────────────────────────────────
+def spotify_public_client():
+    """App-only auth for public catalog lookups — no user login needed."""
+    return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+        client_id=CLIENT_ID, client_secret=CLIENT_SECRET))
+
+def guess_from_file(path, filename):
+    """Best-effort artist/title guess from existing ID3 tags, falling back
+    to an 'Artist - Title.mp3' style filename."""
+    artist = title = None
+    try:
+        tags = ID3(path)
+        if "TPE1" in tags:
+            artist = str(tags["TPE1"].text[0]).strip() or None
+        if "TIT2" in tags:
+            title = str(tags["TIT2"].text[0]).strip() or None
+    except Exception:
+        pass
+
+    if not artist or not title:
+        stem = os.path.splitext(filename)[0]
+        if " - " in stem:
+            guess_artist, guess_title = stem.split(" - ", 1)
+            artist = artist or guess_artist.strip()
+            title = title or guess_title.strip()
+        else:
+            title = title or stem.strip()
+    return artist, title
+
+def import_local_mp3(tmp_path, filename, manifest):
+    """Import an MP3 that didn't come from Spotify: identify it via Spotify
+    search (falling back to its own tags/filename), reject it if the same
+    artist+title is already in the library, then copy it into place and
+    tag it like any other track."""
+    guess_artist, guess_title = guess_from_file(tmp_path, filename)
+    if not guess_title:
+        return {"status": "error", "message": "Couldn't determine a title from the file's tags or filename."}
+
+    artist, title = guess_artist or "Unknown Artist", guess_title
+    album, album_artist, tnum, images, matched = "Unknown Album", artist, 1, [], False
+
+    try:
+        sp = spotify_public_client()
+        query = f"track:{title} artist:{artist}" if guess_artist else f"track:{title}"
+        items = sp.search(q=query, type="track", limit=1)["tracks"]["items"]
+        if items:
+            t = items[0]
+            artist, title = t["artists"][0]["name"], t["name"]
+            album         = t["album"]["name"]
+            album_artist  = t["album"]["artists"][0]["name"]
+            tnum          = t["track_number"]
+            images        = t["album"]["images"]
+            matched       = True
+    except Exception as e:
+        print(f"    Warning: Spotify lookup failed, using file tags: {e}")
+
+    key = normalize_key(artist, title)
+    for info in manifest.values():
+        if not info.get("deleted") \
+           and normalize_key(info["artist"], info["title"]) == key \
+           and os.path.exists(os.path.join(MUSIC_DIR, info["path"])):
+            return {
+                "status":        "duplicate",
+                "message":       f"Already in the library as {info['artist']} - {info['title']}",
+                "existing_path": info["path"],
+            }
+
+    out_dir = os.path.join(MUSIC_DIR, sanitize(artist), sanitize(album))
+    os.makedirs(out_dir, exist_ok=True)
+    stem = os.path.join(out_dir, f"{tnum:02d} - {sanitize(title)}")
+
+    rel_path = (stem + ".mp3").replace(MUSIC_DIR + os.sep, "").replace("\\", "/")
+    for info in manifest.values():
+        if not info.get("deleted") \
+           and info.get("path") == rel_path \
+           and normalize_key(info["artist"], info["title"]) != key:
+            stem += f" [{uuid.uuid4().hex[:6]}]"
+            break
+
+    out_path = stem + ".mp3"
+    rel_path = out_path.replace(MUSIC_DIR + os.sep, "").replace("\\", "/")
+    shutil.move(tmp_path, out_path)
+
+    jpeg = fetch_jpeg(images)
+    cover_path = os.path.join(out_dir, "cover.jpg")
+    if jpeg and not os.path.exists(cover_path):
+        with open(cover_path, "wb") as f:
+            f.write(jpeg)
+
+    write_tags(out_path, artist, album, title, tnum, album_artist, jpeg)
+
+    uri = f"local:{uuid.uuid4().hex}"
+    manifest[uri] = {"path": rel_path, "artist": artist, "title": title, "album": album}
+    save_manifest(manifest)
+
+    return {"status": "added", "matched_spotify": matched, "track": {**manifest[uri], "uri": uri}}
 
 # ── Fetch one playlist's tracks from Spotify ──────────────────────────────────
 def fetch_playlist_tracks(sp, config):
@@ -470,10 +581,11 @@ def main():
         return
 
     if ipod_only:
-        with open(PLAYLISTS_FILE, encoding="utf-8") as f:
-            playlists = json.load(f)
+        playlists = load_playlists()
         if target:
             playlists = [p for p in playlists if p["name"] == target]
+        else:
+            playlists = [p for p in playlists if p["enabled"]]
         manifest = load_manifest()
         sync_to_ipod(manifest, [p["name"] for p in playlists])
         return
@@ -502,14 +614,18 @@ def main():
         print("\nAll done!")
         return
 
-    with open(PLAYLISTS_FILE, encoding="utf-8") as f:
-        playlists = json.load(f)
+    playlists = load_playlists()
 
     if target:
         playlists = [p for p in playlists if p["name"] == target]
         if not playlists:
             print(f"Playlist '{target}' not found in playlists.json")
             sys.exit(1)
+    else:
+        skipped = [p["name"] for p in playlists if not p["enabled"]]
+        playlists = [p for p in playlists if p["enabled"]]
+        if skipped:
+            print(f"Skipping disabled playlist(s): {', '.join(skipped)}")
 
     # Authenticate
     sp = authenticate()
