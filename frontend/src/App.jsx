@@ -25,7 +25,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>iPod Sync</h1>
+        <h1>relay</h1>
         <div className={`ipod-badge ${ipodConnected ? "ipod-badge--on" : ""}`}>
           <span aria-hidden="true">{ipodConnected ? "●" : "○"}</span>
           {ipodConnected === null ? "Checking iPod…" : ipodConnected ? "iPod connected" : "iPod not connected"}

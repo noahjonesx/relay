@@ -274,6 +274,25 @@
   border-collapse: collapse;
   font-size: 13.5px;
 }
+.track-thumb-cell {
+  width: 44px;
+}
+.track-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-2);
+  display: block;
+}
+.track-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .track-table th {
   text-align: left;
   color: var(--text-muted);
