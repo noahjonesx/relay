@@ -210,6 +210,11 @@ async def stop_sync():
 def get_status():
     return sync_state
 
+@app.post("/api/sync/logs/clear")
+def clear_logs():
+    LOG_BUFFER.clear()
+    return {"status": "cleared"}
+
 @app.websocket("/ws/logs")
 async def ws_logs(websocket: WebSocket):
     await websocket.accept()
@@ -409,7 +414,7 @@ def remove_playlist_track(name: str, uri: str):
 # ── iPod status ──────────────────────────────────────────────────────────────
 @app.get("/api/ipod")
 def ipod_status():
-    return {"connected": os.path.isdir(f"{sync.IPOD_DRIVE}\\Music")}
+    return {"connected": os.path.isdir(f"{sync.detect_ipod_drive()}\\Music")}
 
 # ── Manual MP3 import (drag-and-drop) ───────────────────────────────────────
 @app.post("/api/import")

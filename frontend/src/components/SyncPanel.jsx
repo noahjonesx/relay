@@ -133,6 +133,19 @@ export default function SyncPanel() {
 
       {error && <p className="error-text">{error}</p>}
 
+      <div className="log-toolbar">
+        <button
+          className="button button--ghost button--tiny"
+          disabled={lines.length === 0}
+          onClick={() => {
+            setLines([]);
+            api.clearLogs().catch(() => {});
+          }}
+        >
+          Clear log
+        </button>
+      </div>
+
       <pre className="log-view mono" ref={logRef}>
         {lines.length === 0 ? "No output yet — start a sync to see logs here." : lines.join("\n")}
       </pre>

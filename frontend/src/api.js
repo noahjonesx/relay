@@ -56,6 +56,7 @@ export const api = {
     }),
   stopSync: () => request("/sync/stop", { method: "POST" }),
   runDedupe: () => request("/sync/dedupe", { method: "POST" }),
+  clearLogs: () => request("/sync/logs/clear", { method: "POST" }),
   importMp3: async (file) => {
     const form = new FormData();
     form.append("file", file);

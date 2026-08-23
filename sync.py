@@ -1,4 +1,4 @@
-import io, json, os, re, shutil, subprocess, sys, unicodedata, urllib.request, uuid
+import io, json, os, re, shutil, string, subprocess, sys, unicodedata, urllib.request, uuid
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TRCK, TPE2, APIC, ID3NoHeaderError
@@ -7,8 +7,14 @@ from PIL import Image
 # ── Config ────────────────────────────────────────────────────────────────────
 from config import SPOTIFY_CLIENT_ID as CLIENT_ID, SPOTIFY_CLIENT_SECRET as CLIENT_SECRET, REDIRECT_URI
 MUSIC_DIR      = r"C:\Users\noahx\Music\iPod"
-IPOD_DRIVE     = "D:"
+IPOD_DRIVE     = "D:"  # fallback only — detect_ipod_drive() is used everywhere the drive is actually needed
 YTDLP          = r"C:\Users\noahx\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\yt-dlp.exe"
+# YouTube now requires a "PO Token" for most player clients' audio formats,
+# which yt-dlp can't provide without browser cookies/a token plugin. The
+# web_embedded client is currently one of the few that still serves formats
+# without one — if it stops working, check https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
+# for a current alternative client.
+YTDLP_PLAYER_CLIENT = "web_embedded"
 REPO_DIR       = os.path.dirname(os.path.abspath(__file__))
 PLAYLISTS_FILE = os.path.join(REPO_DIR, "playlists.json")
 MANIFEST_FILE  = os.path.join(REPO_DIR, "tracks.json")
@@ -17,6 +23,18 @@ def sanitize(s):
     for c in r'\/:*?"<>|':
         s = s.replace(c, "-")
     return s.strip()
+
+def detect_ipod_drive():
+    """Auto-detect which drive letter the iPod is mounted on. Removable
+    media drive letters can shift between plug-ins (whatever else is
+    connected, mount order, etc.), so hardcoding one is unreliable — look
+    for the iPod/Rockbox folder markers instead. Falls back to IPOD_DRIVE
+    if nothing matching is currently mounted."""
+    for letter in string.ascii_uppercase:
+        drive = f"{letter}:"
+        if os.path.isdir(f"{drive}\\iPod_Control") or os.path.isdir(f"{drive}\\.rockbox"):
+            return drive
+    return IPOD_DRIVE
 
 # ── Playlists config ──────────────────────────────────────────────────────────
 def load_playlists():
@@ -156,7 +174,7 @@ def dedupe_existing(manifest):
         key = normalize_key(info["artist"], info["title"])
         groups.setdefault(key, []).append((uri, info))
 
-    ipod_music = f"{IPOD_DRIVE}\\Music"
+    ipod_music = f"{detect_ipod_drive()}\\Music"
     ipod_connected = os.path.isdir(ipod_music)
     removed = 0
 
@@ -225,6 +243,47 @@ def fetch_jpeg(images):
     except Exception:
         return None
 
+MAX_YTDLP_CANDIDATES = 3
+
+def _search_candidates(artist, title, count=MAX_YTDLP_CANDIDATES):
+    """List up to `count` YouTube results for a search query without
+    downloading anything, so a failed candidate can be skipped without
+    re-running the search."""
+    proc = subprocess.run([
+        YTDLP, f"ytsearch{count}:{artist} {title}",
+        "--flat-playlist", "--skip-download", "--no-color",
+        "--print", "%(id)s\t%(title)s",
+    ], capture_output=True, text=True)
+    candidates = []
+    for line in proc.stdout.splitlines():
+        if "\t" in line:
+            video_id, video_title = line.split("\t", 1)
+            candidates.append((video_id.strip(), video_title.strip()))
+    return candidates
+
+def _download_candidate(video_id, stem):
+    """Try extracting audio from one specific YouTube video. Returns True on
+    success; prints the failure reason and returns False otherwise."""
+    proc = subprocess.Popen([
+        YTDLP, f"https://www.youtube.com/watch?v={video_id}",
+        "-x", "--audio-format", "mp3", "--audio-quality", "0",
+        "--embed-thumbnail", "--no-playlist", "--no-progress", "--no-color",
+        "--extractor-args", f"youtube:player_client={YTDLP_PLAYER_CLIENT}",
+        "-o", stem + ".%(ext)s",
+    ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    output_lines = []
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        print(f"        {line}")
+        output_lines.append(line)
+    proc.wait()
+
+    if proc.returncode != 0:
+        reason = next((l for l in reversed(output_lines) if "ERROR" in l), "unknown error — see output above")
+        print(f"        Reason: {reason}")
+        return False
+    return True
+
 # ── Download one track ────────────────────────────────────────────────────────
 def process_track(track, manifest):
     uri          = track["uri"]
@@ -269,24 +328,21 @@ def process_track(track, manifest):
                 except Exception:
                     pass
 
-        query = f"ytsearch1:{artist} {title}"
-        print(f"    Searching: {query}")
-        proc = subprocess.Popen([
-            YTDLP, query,
-            "-x", "--audio-format", "mp3", "--audio-quality", "0",
-            "--embed-thumbnail", "--no-playlist", "--no-progress", "--no-color",
-            "-o", stem + ".%(ext)s",
-        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        output_lines = []
-        for line in proc.stdout:
-            line = line.rstrip("\n")
-            print(f"      {line}")
-            output_lines.append(line)
-        proc.wait()
+        print(f"    Searching: ytsearch{MAX_YTDLP_CANDIDATES}:{artist} {title}")
+        candidates = _search_candidates(artist, title)
+        if not candidates:
+            print("    No YouTube results found")
+            return None
 
-        if proc.returncode != 0 or not os.path.exists(out_path):
-            reason = next((l for l in reversed(output_lines) if "ERROR" in l), "unknown error — see output above")
-            print(f"    Reason: {reason}")
+        for i, (video_id, video_title) in enumerate(candidates, 1):
+            print(f"    [{i}/{len(candidates)}] Trying: {video_title} (https://youtu.be/{video_id})")
+            if _download_candidate(video_id, stem):
+                break
+        else:
+            print(f"    All {len(candidates)} candidate(s) failed")
+            return None
+
+        if not os.path.exists(out_path):
             return None
 
     # Cover art — fetch from Spotify, write to album folder
@@ -536,7 +592,7 @@ def delete_track(uri, manifest):
         if os.path.exists(full):
             os.remove(full)
             _prune_empty_dirs(os.path.dirname(full), MUSIC_DIR)
-        ipod_music = f"{IPOD_DRIVE}\\Music"
+        ipod_music = f"{detect_ipod_drive()}\\Music"
         if os.path.isdir(ipod_music):
             remove_from_ipod(ipod_music, path)
 
@@ -565,7 +621,7 @@ def clean_deleted(manifest):
         return
 
     print(f"\nCleaning {len(missing)} deleted track(s) from manifest and iPod...")
-    ipod_music = f"{IPOD_DRIVE}\\Music"
+    ipod_music = f"{detect_ipod_drive()}\\Music"
     ipod_connected = os.path.isdir(ipod_music)
 
     for uri, info in missing.items():
@@ -580,11 +636,12 @@ def clean_deleted(manifest):
 
 # ── Sync to iPod ──────────────────────────────────────────────────────────────
 def sync_to_ipod(manifest, synced_names):
-    ipod_music = f"{IPOD_DRIVE}\\Music"
-    ipod_pl    = f"{IPOD_DRIVE}\\Playlists"
+    drive = detect_ipod_drive()
+    ipod_music = f"{drive}\\Music"
+    ipod_pl    = f"{drive}\\Playlists"
 
     if not os.path.isdir(ipod_music):
-        print(f"\niPod not connected at {IPOD_DRIVE} — skipping sync.")
+        print(f"\niPod not connected (checked {drive}) — skipping sync.")
         print("Plug in and run:  py sync.py --ipod-only")
         return
 
