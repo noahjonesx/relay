@@ -269,14 +269,24 @@ def process_track(track, manifest):
                 except Exception:
                     pass
 
-        result = subprocess.run([
-            YTDLP, f"ytsearch1:{artist} {title}",
+        query = f"ytsearch1:{artist} {title}"
+        print(f"    Searching: {query}")
+        proc = subprocess.Popen([
+            YTDLP, query,
             "-x", "--audio-format", "mp3", "--audio-quality", "0",
-            "--embed-thumbnail", "--no-playlist",
+            "--embed-thumbnail", "--no-playlist", "--no-progress", "--no-color",
             "-o", stem + ".%(ext)s",
-            "--quiet", "--no-warnings"
-        ])
-        if result.returncode != 0 or not os.path.exists(out_path):
+        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        output_lines = []
+        for line in proc.stdout:
+            line = line.rstrip("\n")
+            print(f"      {line}")
+            output_lines.append(line)
+        proc.wait()
+
+        if proc.returncode != 0 or not os.path.exists(out_path):
+            reason = next((l for l in reversed(output_lines) if "ERROR" in l), "unknown error — see output above")
+            print(f"    Reason: {reason}")
             return None
 
     # Cover art — fetch from Spotify, write to album folder

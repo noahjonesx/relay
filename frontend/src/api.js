@@ -20,6 +20,14 @@ export const api = {
   deleteTrack: (uri) => request(`/library/${encodeURIComponent(uri)}`, { method: "DELETE" }),
   albums: () => request("/albums"),
   playlists: () => request("/playlists"),
+  addPlaylist: (name, url) =>
+    request("/playlists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, url }),
+    }),
+  removePlaylist: (name) => request(`/playlists/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  lookupPlaylist: (url) => request(`/spotify/lookup?url=${encodeURIComponent(url)}`),
   togglePlaylist: (name, enabled) =>
     request(`/playlists/${encodeURIComponent(name)}/toggle`, {
       method: "POST",
@@ -37,6 +45,8 @@ export const api = {
       method: "DELETE",
     }),
   ipodStatus: () => request("/ipod"),
+  spotifyStatus: () => request("/spotify/status"),
+  spotifyLogin: () => request("/spotify/login", { method: "POST" }),
   syncStatus: () => request("/sync/status"),
   startSync: (opts) =>
     request("/sync/start", {

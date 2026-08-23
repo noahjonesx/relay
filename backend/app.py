@@ -7,8 +7,11 @@ functions directly for read-only/library-editing operations (library list,
 playlist toggles, manual MP3 import). No sync logic is duplicated here.
 """
 import asyncio
+import http.server
 import os
 import sys
+import threading
+import urllib.parse
 import uuid
 from collections import deque
 from datetime import datetime, timezone
@@ -20,6 +23,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from spotipy.oauth2 import SpotifyOAuth
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_DIR))
@@ -33,6 +37,76 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Spotify login (no terminal needed) ──────────────────────────────────────
+# sync.py's normal CLI flow prompts for a pasted-in redirect URL, which can't
+# work from a headless subprocess (no stdin). Instead, we spin up a one-shot
+# local HTTP server matching REDIRECT_URI to catch Spotify's OAuth redirect
+# automatically, so login can happen entirely by clicking a button and
+# finishing the flow in a browser tab.
+OAUTH_SCOPE = "playlist-read-private playlist-read-collaborative user-library-read"
+
+def _make_oauth():
+    return SpotifyOAuth(
+        client_id=sync.CLIENT_ID,
+        client_secret=sync.CLIENT_SECRET,
+        redirect_uri=sync.REDIRECT_URI,
+        scope=OAUTH_SCOPE,
+        cache_path=os.path.join(sync.REPO_DIR, ".spotify_cache"),
+        open_browser=False,
+    )
+
+class _OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        self.server.oauth_params = params
+        ok = "code" in params
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        msg = (
+            "Logged in to Spotify — you can close this tab."
+            if ok
+            else "Spotify login failed — you can close this tab and try again."
+        )
+        self.wfile.write(f"<html><body style='font-family:sans-serif;padding:40px'>{msg}</body></html>".encode())
+
+    def log_message(self, *args):
+        pass  # silence default request logging to stderr
+
+def _run_oauth_callback_server(oauth, timeout=180):
+    parsed = urllib.parse.urlparse(sync.REDIRECT_URI)
+    try:
+        server = http.server.HTTPServer((parsed.hostname, parsed.port), _OAuthCallbackHandler)
+    except OSError as e:
+        print(f"Couldn't start the Spotify login listener on {sync.REDIRECT_URI}: {e}")
+        return
+    server.timeout = timeout
+    server.oauth_params = None
+    try:
+        server.handle_request()  # blocks for exactly one request, or until timeout
+    finally:
+        server.server_close()
+
+    params = server.oauth_params or {}
+    if "code" in params:
+        try:
+            oauth.get_access_token(params["code"][0], as_dict=False)
+        except Exception as e:
+            print(f"Spotify token exchange failed: {e}")
+    elif "error" in params:
+        print(f"Spotify login failed: {params['error'][0]}")
+
+@app.get("/api/spotify/status")
+def spotify_status():
+    return {"authenticated": bool(_make_oauth().get_cached_token())}
+
+@app.post("/api/spotify/login")
+def spotify_login():
+    oauth = _make_oauth()
+    url = oauth.get_authorize_url()
+    threading.Thread(target=_run_oauth_callback_server, args=(oauth,), daemon=True).start()
+    return {"url": url}
 
 # ── Live sync run state ─────────────────────────────────────────────────────
 LOG_BUFFER = deque(maxlen=4000)
@@ -66,6 +140,15 @@ async def _run_sync(args):
     global _proc
     sync_state.update(running=True, args=args, started_at=_now(), finished_at=None, exit_code=None)
     await _broadcast(f"$ py sync.py {' '.join(args)}")
+
+    # sync.py's interactive login can't work headlessly (no stdin) — catch
+    # this up front instead of letting the subprocess crash on input().
+    needs_auth = "--ipod-only" not in args and "--dedupe" not in args
+    if needs_auth and not _make_oauth().get_cached_token():
+        await _broadcast('Spotify login required — click "Login to Spotify" above, then try again.')
+        sync_state.update(running=False, finished_at=_now(), exit_code=1)
+        return
+
     try:
         _proc = await asyncio.create_subprocess_exec(
             sys.executable, str(REPO_DIR / "sync.py"), *args,
@@ -234,6 +317,49 @@ def _serialize_playlist(p, manifest):
 def get_playlists():
     manifest = sync.load_manifest()
     return [_serialize_playlist(p, manifest) for p in sync.load_playlists()]
+
+@app.get("/api/spotify/lookup")
+def lookup_playlist(url: str):
+    """Resolve a Spotify playlist URL to its display name, via app-only auth
+    (no login) — used to auto-fill the name field when a link is dropped in.
+    Only works for public playlists; private ones just won't resolve."""
+    if "/playlist/" not in url:
+        raise HTTPException(400, "That doesn't look like a Spotify playlist URL")
+    pid = url.split("/playlist/")[1].split("?")[0]
+    try:
+        info = sync.spotify_public_client().playlist(pid, fields="name")
+    except Exception as e:
+        raise HTTPException(404, f"Couldn't look up that playlist: {e}")
+    return {"name": info.get("name", "")}
+
+class AddPlaylistRequest(BaseModel):
+    name: str
+    url: str
+
+@app.post("/api/playlists")
+def add_playlist(req: AddPlaylistRequest):
+    name, url = req.name.strip(), req.url.strip()
+    if not name or not url:
+        raise HTTPException(400, "Name and URL are required")
+    if "/playlist/" not in url:
+        raise HTTPException(400, "That doesn't look like a Spotify playlist URL")
+
+    playlists = sync.load_playlists()
+    if any(p["name"] == name for p in playlists):
+        raise HTTPException(409, f"Playlist '{name}' already exists")
+
+    playlists.append({"name": name, "url": url, "enabled": True})
+    sync.save_playlists(playlists)
+    return _serialize_playlist(playlists[-1], sync.load_manifest())
+
+@app.delete("/api/playlists/{name}")
+def remove_playlist(name: str):
+    playlists = sync.load_playlists()
+    remaining = [p for p in playlists if p["name"] != name]
+    if len(remaining) == len(playlists):
+        raise HTTPException(404, f"Playlist '{name}' not found")
+    sync.save_playlists(remaining)
+    return {"status": "removed"}
 
 class ToggleRequest(BaseModel):
     enabled: Optional[bool] = None  # omit to flip the current value

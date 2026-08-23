@@ -383,6 +383,29 @@
 }
 
 /* Playlists */
+.add-playlist-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1.5px dashed transparent;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.add-playlist-form--dragging {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.add-playlist-form .text-input {
+  flex: 1;
+  min-width: 160px;
+}
+.add-playlist-form .error-text {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+
 .playlist-list {
   list-style: none;
   margin: 0;
@@ -475,6 +498,18 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.sync-toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.spotify-auth-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .sync-buttons {
   display: flex;

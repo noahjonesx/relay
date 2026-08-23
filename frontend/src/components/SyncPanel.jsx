@@ -2,6 +2,52 @@ import { useEffect, useRef, useState } from "react";
 import { api, connectLogSocket } from "../api";
 import StatusPill from "./StatusPill";
 
+function SpotifyAuth() {
+  const [status, setStatus] = useState(null);
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const refresh = () => api.spotifyStatus().then(setStatus).catch(() => {});
+    refresh();
+    const id = setInterval(refresh, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (waiting && status?.authenticated) setWaiting(false);
+  }, [status, waiting]);
+
+  const login = async () => {
+    setError(null);
+    setWaiting(true);
+    try {
+      const { url } = await api.spotifyLogin();
+      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      setError(e.message);
+      setWaiting(false);
+    }
+  };
+
+  if (!status) return null;
+
+  return (
+    <div className="spotify-auth-row">
+      <StatusPill
+        variant={status.authenticated ? "good" : "critical"}
+        label={status.authenticated ? "Spotify connected" : "Spotify login required"}
+      />
+      {!status.authenticated && (
+        <button className="button button--ghost button--tiny" onClick={login} disabled={waiting}>
+          {waiting ? "Waiting for login…" : "Login to Spotify"}
+        </button>
+      )}
+      {error && <span className="error-text">{error}</span>}
+    </div>
+  );
+}
+
 export default function SyncPanel() {
   const [lines, setLines] = useState([]);
   const [status, setStatus] = useState({ running: false, exit_code: null });
@@ -42,7 +88,10 @@ export default function SyncPanel() {
   return (
     <div className="panel-stack">
       <div className="sync-toolbar">
-        <StatusPill variant={pillVariant} />
+        <div className="sync-toolbar-header">
+          <StatusPill variant={pillVariant} />
+          <SpotifyAuth />
+        </div>
         <div className="sync-buttons">
           <button
             className="button"
