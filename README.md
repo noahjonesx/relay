@@ -1,6 +1,6 @@
 # ipod
 
-Automated Spotify → iPod Classic pipeline. Reads your playlists directly from the Spotify API, sources audio, tags everything with correct metadata and album art, generates Rockbox-compatible playlists, and syncs to the device — all in one command.
+Spotify → iPod pipeline. Reads your playlists directly from the Spotify API, sources audio, tags everything with correct metadata and album art, generates Rockbox-compatible playlists, and syncs to your device
 
 Built for a 5th gen iPod Classic running [Rockbox](https://www.rockbox.org/).
 
@@ -12,13 +12,12 @@ py sync.py
 
 ## what it does
 
-1. **Reads playlists from Spotify** — no CSV exports, no third-party tools. Uses the Spotify Web API directly via OAuth.
+1. **Reads playlists from Spotify** - Uses the Spotify Web API directly via OAuth.
 2. **Sources audio** for any track not already in your local library
 3. **Tags every file** with Spotify metadata: title, artist, album, track number, album artist
-4. **Fetches real album art** from Spotify's CDN (not thumbnails) — saves as embedded APIC tag + `cover.jpg` for Rockbox display
-5. **Generates `.m3u8` playlists** with correct Rockbox-relative paths (`/<HDD0>/Music/...`)
-6. **Syncs to iPod** via robocopy — music to `D:\Music\`, playlists to `D:\Playlists\`
-7. **Tracks deletions** — remove a folder locally, run sync, and it's gone from the manifest and iPod permanently (won't redownload)
+4. **Fetches real album art** from Spotify's CDN & saves as embedded APIC tag + `cover.jpg` for Rockbox display
+5. **Generates `.m3u8` playlists** with Rockbox-relative paths (`/<HDD0>/Music/...`)
+6. **Syncs to iPod** via robocopy
 
 ---
 
