@@ -1,8 +1,8 @@
 const VARIANTS = {
   idle:    { icon: "○", label: "Idle",    className: "muted" },
   running: { icon: "●", label: "Running", className: "accent" },
-  good:    { icon: "✓", label: "Done",    className: "good" },
-  critical:{ icon: "✕", label: "Failed",  className: "critical" },
+  good:    { icon: "●", label: "Done",    className: "good" },
+  critical:{ icon: "●", label: "Failed",  className: "critical" },
 };
 
 export default function StatusPill({ variant, label }) {

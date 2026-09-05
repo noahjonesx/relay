@@ -82,7 +82,7 @@ function AddPlaylistForm({ onAdded }) {
       />
       <input
         className="text-input"
-        placeholder="Spotify playlist URL — or drop a link here"
+        placeholder="Spotify playlist URL, or drop a link here"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         required
@@ -182,7 +182,7 @@ export default function Playlists({ onSyncStarted }) {
       </ul>
       <p className="text-muted">
         Disabled playlists are skipped on the next full sync but aren't removed from your library.
-        Local imports added to a playlist show up here — assign them from the Library tab.
+        Local imports added to a playlist show up here. Assign them from the Library tab.
       </p>
     </div>
   );

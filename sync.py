@@ -22,7 +22,9 @@ MANIFEST_FILE  = os.path.join(REPO_DIR, "tracks.json")
 def sanitize(s):
     for c in r'\/:*?"<>|':
         s = s.replace(c, "-")
-    return s.strip()
+    # Windows silently rejects path components ending in a dot or space
+    # (e.g. artist "Fred again.." would break os.makedirs) — strip those too.
+    return s.strip().rstrip(". ")
 
 def detect_ipod_drive():
     """Auto-detect which drive letter the iPod is mounted on. Removable

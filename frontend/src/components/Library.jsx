@@ -80,7 +80,7 @@ export default function Library() {
       const result = await api.deleteTrack(t.uri);
       setToast(
         result.shared_file_retained
-          ? `Removed "${t.title}" (file kept — still used by a duplicate)`
+          ? `Removed "${t.title}" (file kept, still used by a duplicate)`
           : `Deleted "${t.title}" from the library and iPod`
       );
       load();

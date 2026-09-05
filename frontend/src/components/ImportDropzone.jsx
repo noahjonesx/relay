@@ -63,7 +63,7 @@ export default function ImportDropzone({ onImported }) {
               <span className="import-result-status">
                 {r.status === "uploading" && "Uploading…"}
                 {r.status === "added" &&
-                  `Added — ${r.result.track.artist} · ${r.result.track.title}${
+                  `Added: ${r.result.track.artist} · ${r.result.track.title}${
                     r.result.matched_spotify ? "" : " (no Spotify match, using file tags)"
                   }`}
                 {r.status === "duplicate" && r.result.message}

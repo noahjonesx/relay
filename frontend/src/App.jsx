@@ -1,19 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import Library from "./components/Library";
 import Playlists from "./components/Playlists";
 import SyncPanel from "./components/SyncPanel";
 import "./App.css";
 
-const TABS = [
-  { id: "library", label: "Library" },
-  { id: "playlists", label: "Playlists" },
-  { id: "sync", label: "Sync" },
-];
-
 export default function App() {
-  const [tab, setTab] = useState("library");
   const [ipodConnected, setIpodConnected] = useState(null);
+  const syncRef = useRef(null);
 
   useEffect(() => {
     const check = () => api.ipodStatus().then((r) => setIpodConnected(r.connected)).catch(() => {});
@@ -21,6 +15,10 @@ export default function App() {
     const id = setInterval(check, 5000);
     return () => clearInterval(id);
   }, []);
+
+  const scrollToSync = () => {
+    syncRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="app-shell">
@@ -32,22 +30,25 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="app-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`app-tab ${tab === t.id ? "app-tab--active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <main className="dashboard-grid">
+        <div className="dashboard-col dashboard-col--side">
+          <section className="dashboard-section" ref={syncRef}>
+            <h2 className="dashboard-section-title">Sync</h2>
+            <SyncPanel />
+          </section>
 
-      <main className="app-main">
-        {tab === "library" && <Library />}
-        {tab === "playlists" && <Playlists onSyncStarted={() => setTab("sync")} />}
-        {tab === "sync" && <SyncPanel />}
+          <section className="dashboard-section">
+            <h2 className="dashboard-section-title">Playlists</h2>
+            <Playlists onSyncStarted={scrollToSync} />
+          </section>
+        </div>
+
+        <div className="dashboard-col dashboard-col--main">
+          <section className="dashboard-section">
+            <h2 className="dashboard-section-title">Library</h2>
+            <Library />
+          </section>
+        </div>
       </main>
     </div>
   );

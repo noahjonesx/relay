@@ -147,7 +147,7 @@ export default function SyncPanel() {
       </div>
 
       <pre className="log-view mono" ref={logRef}>
-        {lines.length === 0 ? "No output yet — start a sync to see logs here." : lines.join("\n")}
+        {lines.length === 0 ? "No output yet. Start a sync to see logs here." : lines.join("\n")}
       </pre>
     </div>
   );

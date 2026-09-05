@@ -23,14 +23,14 @@
   --status-critical:    #e2707a;
   --status-critical-dim: rgba(226, 112, 122, 0.14);
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --shadow-1: none;
+  --shadow-2: none;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
-  font-family: "Segoe UI", -apple-system, Inter, system-ui, sans-serif;
+  font-family: "Segoe UI", -apple-system, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -40,9 +40,7 @@
 
 body {
   margin: 0;
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(91, 141, 239, 0.08), transparent),
-    var(--surface-0);
+  background: var(--surface-0);
   color: var(--text-primary);
   min-height: 100vh;
 }

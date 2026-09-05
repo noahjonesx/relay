@@ -151,11 +151,12 @@ async def _run_sync(args):
 
     try:
         _proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(REPO_DIR / "sync.py"), *args,
+            sys.executable, "-u", str(REPO_DIR / "sync.py"), *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
             cwd=str(REPO_DIR),
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
         async for raw in _proc.stdout:
             await _broadcast(raw.decode(errors="replace").rstrip("\r\n"))
